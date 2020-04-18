@@ -9,7 +9,8 @@ public class Cell : MonoBehaviour
     public GameObject goal;
     public GameObject item;
     public GameObject obstacle;
-    public Sprite[] sprites;
+    public Sprite[] goal_sprites;
+    public Sprite[] final_goal_sprites;
 
     CellType type;
 
@@ -18,18 +19,18 @@ public class Cell : MonoBehaviour
     // Item - Will be spread out. Could be critical or non-critical.
     // Goal - Goals for ending the level.
     // Generation algorithm -
-    //  1. Place goals
-    //  2. Find path to goals
+    //  1. Place goals, place random obstacles
+    //  2. Find path to goals using A*, remove obstacles if needed
     //  3. Add items on the path to goals
     //  4. Excepting the paths
     //     - Add noncrucial items at random (25%?)
     //     - Add obstacles (50%?)
     public enum CellType { PLAYER, BG, OBSTACLE, ITEM, GOAL };
-    
+
     // Start is called before the first frame update
     void Start()
     {
-        
+
     }
 
     public bool IsValidNeighbor()
@@ -43,13 +44,30 @@ public class Cell : MonoBehaviour
         this.GetComponent<SpriteRenderer>().color = color;
         this.type = CellType.BG;
     }
+    
+    public void SetItem()
+    {
+        if (this.type != CellType.BG)
+        {
+            return;
+        }
+        item.SetActive(true);
+        this.type = CellType.ITEM;
+        return;
+    }
+
+    public void ConsumeItem()
+    {
+        item.SetActive(false);
+        this.type = CellType.BG;
+    }
 
     public void SetPlayer(bool on)
     {
         player.SetActive(on);
         if (on)
         {
-            this.type = CellType.PLAYER;   
+            this.type = CellType.PLAYER;
         } else
         {
             this.type = CellType.BG;
@@ -62,8 +80,8 @@ public class Cell : MonoBehaviour
         {
             return false;
         }
-        // TODO: Add distance checks to make sure it's far from player
-        goal.GetComponent<SpriteRenderer>().sprite = sprites[i];
+        goal.SetActive(true);
+        goal.GetComponent<SpriteRenderer>().sprite = goal_sprites[i];
         this.type = CellType.GOAL;
         return true;
     }
@@ -73,15 +91,28 @@ public class Cell : MonoBehaviour
         return type;
     }
 
-    public bool PlaceObstacle()
+    public void SetFinalGoal(int i)
     {
-        if (this.type != CellType.BG)
+        goal.SetActive(true);
+        goal.GetComponent<SpriteRenderer>().sprite = final_goal_sprites[i];
+        this.type = CellType.GOAL;
+    }
+
+    public bool PlaceObstacle(bool on)
+    {
+        if (on)
         {
-            return false;
+            if (this.type != CellType.BG)
+            {
+                return false;
+            }
+            type = CellType.OBSTACLE;
+        } else
+        {
+            type = CellType.BG;
         }
 
-        obstacle.SetActive(true);
-        type = CellType.OBSTACLE;
+        obstacle.SetActive(on);
         return true;
     }
 

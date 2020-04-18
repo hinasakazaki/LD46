@@ -1,16 +1,22 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class LevelScript : MonoBehaviour
 {
     public GameObject cell;
-    public int rows = 17;
+    public int rows = 14;
     public int columns = 27;
     public GameObject[,] cells;
     public Coordinates currPos = new Coordinates(0, 0);
     public List<Coordinates> activeGoals = new List<Coordinates>();
-
+    public List<Coordinates> finalGoals = new List<Coordinates>();
+    public List<Coordinates> obstacles = new List<Coordinates>();
+    public HashSet<Coordinates> noObstaclesAllowed = new HashSet<Coordinates>();
+    public int points = 0;
+    public Time time;
+  
     // Start is called before the first frame update
     void Start()
     {
@@ -39,35 +45,87 @@ public class LevelScript : MonoBehaviour
         }
 
         // Find starting place
-        currPos.x = Random.Range(0, rows);
-        currPos.y = Random.Range(0, columns);
+        // Start at some place in the wall
+        int four_sided_dice = Random.Range(0, 4);
+        switch (four_sided_dice)
+        {
+            case 0:
+                currPos = new Coordinates(0, Random.Range(0, columns));
+                break;
+            case 1:
+                currPos = new Coordinates(rows - 1, Random.Range(0, columns));
+                break;
+            case 2:
+                currPos = new Coordinates(Random.Range(0, rows), 0);
+                break;
+            default:
+                currPos = new Coordinates(Random.Range(0, rows), columns - 1);
+                break;
+        }
         Debug.Log("Starting position: " + currPos.x + ", " + currPos.y);
         cells[currPos.x, currPos.y].GetComponent<Cell>().SetPlayer(true);
 
         // Find two goals
         int goalCount = 2;
         int goalsPlaced = 0;
-        int[] goals = GetGoals(2);
+        int[] goals = GetGoals(goalCount);
+
+        int finalGoalCount = 0;
         while (goalsPlaced < goalCount)
         {
             int x = Random.Range(0, rows);
             int y = Random.Range(0, columns);
+            Coordinates goal_candidate = new Coordinates(x, y);
+            if (StraightlineEstimate(currPos, goal_candidate) < rows)
+            {
+                continue;
+            }
             if (cells[x, y].GetComponent<Cell>().SetGoal(goals[goalsPlaced]))
             {
                 goalsPlaced += 1;
-                activeGoals.Add(new Coordinates(x, y));
+                activeGoals.Add(goal_candidate);
                 Debug.Log("Goal " + goalsPlaced + " position: " + x + ", " + y);
+
+                // Add end goals extended from active goals
+                // in the future i think this will be extended to a moving target
+                // add some randomness and otherwise it's just a BFS
+                Coordinates path = goal_candidate;
+                int dist = 4;
+                for (int i = 0; i < dist; i++)
+                {
+                    Coordinates[] neighbors = FindValidNeighbors(path);
+                    if (neighbors.Length == 0)
+                    {
+                        Debug.LogError("Things are bad (no final goals available) so reloading scene.");
+                        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+                    }
+                    Coordinates randomNeighbor = neighbors[Random.Range(0, neighbors.Length)];
+                    while (randomNeighbor.Equals(goal_candidate))
+                    {
+                        neighbors = FindValidNeighbors(path);
+                        randomNeighbor = neighbors[Random.Range(0, neighbors.Length)];
+                    }
+                    noObstaclesAllowed.Add(path);
+                    path = randomNeighbor;
+                }
+                // finally add final goal
+                cells[path.x, path.y].GetComponent<Cell>().SetFinalGoal(finalGoalCount);
+                finalGoals.Add(path);
+                finalGoalCount += 1;
+                Debug.Log("Final goal added " + path.x + ", " + path.y);
             }
         }
 
         // Fill some random obstacles
-        int randomObstacleCount = Random.Range(34, 54);
+        int randomObstacleCount = Random.Range(20, 30);
         int obstaclesPlaced = 0;
         while (obstaclesPlaced < randomObstacleCount)
         {
-            if (cells[Random.Range(0, rows), Random.Range(0, columns)].GetComponent<Cell>().PlaceObstacle())
+            Coordinates obstacle_candidate = new Coordinates(Random.Range(0, rows), Random.Range(0, columns));
+            if (!noObstaclesAllowed.Contains(obstacle_candidate) && cells[obstacle_candidate.x, obstacle_candidate.y].GetComponent<Cell>().PlaceObstacle(true))
             {
                 obstaclesPlaced += 1;
+                obstacles.Add(obstacle_candidate);
             }
         }
 
@@ -75,18 +133,51 @@ public class LevelScript : MonoBehaviour
         foreach (Coordinates goal in activeGoals)
         {
             List<Coordinates> pathToGoal = AstarFindPath(goal);
+            while (pathToGoal.Count == 0)
+            {
+                RemoveRandomObstacle();
+                pathToGoal = AstarFindPath(goal);
+            }
             foreach (Coordinates c in pathToGoal.ToArray())
             {
-                Debug.Log("Path: " + c.x + ", " + c.y);
-                cells[c.x, c.y].GetComponent<Cell>().SetColor(new Color32(0xFE, 0xE2, 0xE1, 0xFF));
+                //cells[c.x, c.y].GetComponent<Cell>().SetColor(new Color32(0xFE, 0xE2, 0xE1, 0xFF));
+                noObstaclesAllowed.Add(c);
+                if (Random.Range(0, 6) == 1)
+                {
+                    // Put items at a 16% chance
+                    cells[c.x, c.y].GetComponent<Cell>().SetItem();
+                }
+
             }
-
         }
-        
-       
-        // Fill out more
 
-        // 
+        // For the rest of the cells,
+        // 25% items
+        // 50% obstacles
+        for (int i = 0; i < rows; i++)
+        {
+            for (int j = 0; j < columns; j++)
+            {
+                // Put items at a 25% chance 
+                if (Random.Range(0, 4) == 1)
+                {
+                    // Put items at a 25% chance
+                    cells[i, j].GetComponent<Cell>().SetItem();
+                }
+                else if (!noObstaclesAllowed.Contains(new Coordinates(i, j)) && Random.Range(0, 2) == 1)
+                {
+                    // 50% obstacle
+                    cells[i, j].GetComponent<Cell>().PlaceObstacle(true);
+                }
+            }
+        }
+    }
+
+    private void RemoveRandomObstacle()
+    {
+        int removeIndex = Random.Range(0, obstacles.Count);
+        cells[obstacles[removeIndex].x, obstacles[removeIndex].y].GetComponent<Cell>().PlaceObstacle(false);
+
     }
 
     private List<Coordinates> AstarFindPath(Coordinates goal)
@@ -106,8 +197,6 @@ public class LevelScript : MonoBehaviour
 
             [currPos] = StraightlineEstimate(currPos, goal)
         };
-
-        Debug.Log("HINA" + passThroughCostHeuristic[currPos]);
 
         while (openSet.Count != 0)
         {
@@ -185,6 +274,7 @@ public class LevelScript : MonoBehaviour
             if (heuristicScores[c] < min)
             {
                 currMin = c;
+                min = heuristicScores[c];
             }
         }
         return currMin;
@@ -228,31 +318,47 @@ public class LevelScript : MonoBehaviour
         return goals.ToArray();
     }
 
+    public float timePass = 0f;
+
     // Update is called once per frame
     void Update()
     {
+        if (timePass < .05f)
+        {
+            timePass += Time.deltaTime;
+            return;
+        }
+
+        timePass = 0f;
+
         bool move = false;
         int newX = currPos.x;
         int newY = currPos.y;
-        if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W))
+
+        if (Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.W))
         {
             move = true;
             newX -= 1;
         }
-        else if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S))
+        else if (Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S))
         {
             move = true;
             newX += 1;
         }
-        else if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A))
+        else if (Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.A))
         {
             move = true;
             newY -= 1;
         }
-        else if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D))
+        else if (Input.GetKey(KeyCode.RightArrow) || Input.GetKey(KeyCode.D))
         {
             move = true;
             newY += 1;
+        }
+        else if (Input.GetKey(KeyCode.R))
+        {
+            Debug.LogError("Reloading scene from command.");
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
         if (move && MoveProcess(newX, newY))
         {
@@ -266,8 +372,18 @@ public class LevelScript : MonoBehaviour
 
     bool MoveProcess(int newX, int newY)
     {
-        if (cells[newX, newY].GetComponent<Cell>().GetCellType() != Cell.CellType.BG) {
+        if (newX < 0 || newX >= rows || newY < 0 || newY >= columns)
+        {
             return false;
+        }
+        Cell newCell = cells[newX, newY].GetComponent<Cell>();
+        if (newCell.GetCellType() == Cell.CellType.OBSTACLE) {
+            return false;
+        }
+        if (newCell.GetCellType() == Cell.CellType.ITEM)
+        {
+            newCell.ConsumeItem();
+            points += 1;
         }
         // If item, pick it up
         // If goal, take them
