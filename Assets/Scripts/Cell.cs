@@ -37,7 +37,7 @@ public class Cell : MonoBehaviour
 
     }
 
-    public void GetPersonName()
+    public string GetPersonName()
     {
         return personName;
     }

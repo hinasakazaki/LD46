@@ -154,7 +154,13 @@ public class LevelScript : MonoBehaviour
                     path = randomNeighbor;
                 }
                 // finally add final goal
-                cells[path.x, path.y].GetComponent<Cell>().SetPerson(finalGoalCount);
+                 if (goalsPlaced == 1)
+                {
+                    cells[path.x, path.y].GetComponent<Cell>().SetPerson(finalGoalCount, personA);
+                } else
+                {
+                    cells[path.x, path.y].GetComponent<Cell>().SetPerson(finalGoalCount, personB);
+                }
                 finalGoals.Add(path);
                 finalGoalCount += 1;
                 Debug.Log("Final goal added " + path.x + ", " + path.y);
