@@ -2,9 +2,13 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class LevelScript : MonoBehaviour
 {
+    public AudioManager audioManager;
+    public LetterManager letterManager;
+
     public GameObject cell;
     public int rows = 14;
     public int columns = 27;
@@ -14,11 +18,40 @@ public class LevelScript : MonoBehaviour
     public List<Coordinates> finalGoals = new List<Coordinates>();
     public List<Coordinates> obstacles = new List<Coordinates>();
     public HashSet<Coordinates> noObstaclesAllowed = new HashSet<Coordinates>();
+
     public int points = 0;
-    public Time time;
-  
+    public Text timeLabel;
+    public Text pointsLabel;
+    public Text objectiveLabel;
+    public string objectiveString;
+    public GameObject letterPreview;
+
+    public bool holdingLetter = false;
+    public Letter currentLetter;
+    private bool toggleLetter = false;  // hide --> show, show --> hide
+
+    string[] personANames = new List<string> { "Skye", "Noa", "Caelan", "Flynn", "Jesse" }.ToArray();
+    string[] personBNames = new List<string> { "Harper", "Hayden", "Linden", "Nevada", "Oakley"}.ToArray();
+
+    string personA;
+    string personB;
+
     // Start is called before the first frame update
     void Start()
+    {
+        personA = personANames[Random.Range(0, personANames.Length)];
+        personB = personBNames[Random.Range(0, personBNames.Length)];
+
+        objectiveString = "Objectives \n \n- Pick up \"emotion\" letters using X and find the true emotions.";
+
+        SetBackgroundCells();
+
+        SetPlayerStartingPosition();
+
+        FillGoalsAndItems();
+    }
+
+    private void SetBackgroundCells()
     {
         cells = new GameObject[rows, columns];
         // Decide color scheme first
@@ -26,8 +59,7 @@ public class LevelScript : MonoBehaviour
         float x_pos = -7.7f;
         float y_pos = 4.7f;
         float cell_width = .59f;
-
-        // Set background cells
+         
         ColorScheme color_scheme = new ColorScheme();
         for (int i = 0; i < rows; i++)
         {
@@ -43,7 +75,10 @@ public class LevelScript : MonoBehaviour
             y_pos -= cell_width;
             x_pos = -7.7f; ;
         }
+    }
 
+    private void SetPlayerStartingPosition()
+    {
         // Find starting place
         // Start at some place in the wall
         int four_sided_dice = Random.Range(0, 4);
@@ -64,7 +99,10 @@ public class LevelScript : MonoBehaviour
         }
         Debug.Log("Starting position: " + currPos.x + ", " + currPos.y);
         cells[currPos.x, currPos.y].GetComponent<Cell>().SetPlayer(true);
+    }
 
+    private void FillGoalsAndItems()
+    {
         // Find two goals
         int goalCount = 2;
         int goalsPlaced = 0;
@@ -80,8 +118,15 @@ public class LevelScript : MonoBehaviour
             {
                 continue;
             }
-            if (cells[x, y].GetComponent<Cell>().SetGoal(goals[goalsPlaced]))
+            if (cells[x, y].GetComponent<Cell>().SetLetter(goals[goalsPlaced]))
             {
+                if (goalsPlaced == 0)
+                {
+                    letterManager.SetRealLetter(cells[x, y].GetComponent<Cell>(), personA, personB);
+                } else
+                {
+                    letterManager.SetRealLetter(cells[x, y].GetComponent<Cell>(), personB, personA);
+                }
                 goalsPlaced += 1;
                 activeGoals.Add(goal_candidate);
                 Debug.Log("Goal " + goalsPlaced + " position: " + x + ", " + y);
@@ -90,7 +135,7 @@ public class LevelScript : MonoBehaviour
                 // in the future i think this will be extended to a moving target
                 // add some randomness and otherwise it's just a BFS
                 Coordinates path = goal_candidate;
-                int dist = 4;
+                int dist = 6;
                 for (int i = 0; i < dist; i++)
                 {
                     Coordinates[] neighbors = FindValidNeighbors(path);
@@ -109,7 +154,7 @@ public class LevelScript : MonoBehaviour
                     path = randomNeighbor;
                 }
                 // finally add final goal
-                cells[path.x, path.y].GetComponent<Cell>().SetFinalGoal(finalGoalCount);
+                cells[path.x, path.y].GetComponent<Cell>().SetPerson(finalGoalCount);
                 finalGoals.Add(path);
                 finalGoalCount += 1;
                 Debug.Log("Final goal added " + path.x + ", " + path.y);
@@ -142,7 +187,7 @@ public class LevelScript : MonoBehaviour
             {
                 //cells[c.x, c.y].GetComponent<Cell>().SetColor(new Color32(0xFE, 0xE2, 0xE1, 0xFF));
                 noObstaclesAllowed.Add(c);
-                if (Random.Range(0, 6) == 1)
+                if (!(currPos.Equals(c)) && Random.Range(0, 6) == 1)
                 {
                     // Put items at a 16% chance
                     cells[c.x, c.y].GetComponent<Cell>().SetItem();
@@ -151,23 +196,36 @@ public class LevelScript : MonoBehaviour
             }
         }
 
-        // For the rest of the cells,
-        // 25% items
-        // 50% obstacles
+        // For the rest of the cells, fill with random items, fake goals, and more obstacles.
         for (int i = 0; i < rows; i++)
         {
             for (int j = 0; j < columns; j++)
             {
-                // Put items at a 25% chance 
-                if (Random.Range(0, 4) == 1)
+                if (!(i == currPos.x && j == currPos.y))
                 {
-                    // Put items at a 25% chance
-                    cells[i, j].GetComponent<Cell>().SetItem();
-                }
-                else if (!noObstaclesAllowed.Contains(new Coordinates(i, j)) && Random.Range(0, 2) == 1)
-                {
-                    // 50% obstacle
-                    cells[i, j].GetComponent<Cell>().PlaceObstacle(true);
+                    if (Random.Range(0, 40) == 1)
+                    {
+                        // Put letter in at 10% chance
+                        cells[i, j].GetComponent<Cell>().SetLetter(0);
+                        string person1 = personA;
+                        string person2 = personB;
+                        if (Random.Range(0, 2) == 1)
+                        {
+                            person1 = personB;
+                            person2 = personA;
+                        }
+                        letterManager.SetFakeLetter(cells[i, j].GetComponent<Cell>(), person1, person2);
+                    }
+                    else if (Random.Range(0, 4) == 1)
+                    {
+                        // Put items at a 25% chance
+                        cells[i, j].GetComponent<Cell>().SetItem();
+                    }
+                    else if (!noObstaclesAllowed.Contains(new Coordinates(i, j)) && Random.Range(0, 2) == 1)
+                    {
+                        // 50% obstacle
+                        cells[i, j].GetComponent<Cell>().PlaceObstacle(true);
+                    }
                 }
             }
         }
@@ -177,7 +235,6 @@ public class LevelScript : MonoBehaviour
     {
         int removeIndex = Random.Range(0, obstacles.Count);
         cells[obstacles[removeIndex].x, obstacles[removeIndex].y].GetComponent<Cell>().PlaceObstacle(false);
-
     }
 
     private List<Coordinates> AstarFindPath(Coordinates goal)
@@ -320,9 +377,92 @@ public class LevelScript : MonoBehaviour
 
     public float timePass = 0f;
 
+    private void SetTimer()
+    {
+        float seconds = Time.timeSinceLevelLoad;
+        string mins = "00";
+        string secs = "00";
+        if (seconds > 60)
+        {
+            mins = ((int)seconds / 60).ToString();
+        }
+
+        if (seconds > 0)
+        {
+            int secs_int = ((int)seconds % 60);
+            if (secs_int < 10)
+            {
+                secs = "0" + secs_int.ToString();
+            }
+            else
+            {
+                secs = secs_int.ToString();
+            }
+        }
+        timeLabel.text = mins + ":" + secs.Substring(0, 2);
+    }
+
+    private void SetPoints()
+    {
+        pointsLabel.text = points.ToString();
+    }
+
+    private void SetObjective()
+    {
+        objectiveLabel.text = objectiveString;
+    }
+
     // Update is called once per frame
     void Update()
     {
+        SetTimer();
+        SetPoints();
+        SetObjective();
+
+        
+        // Do letter toggle input handling here before timing is weird
+        if (Input.GetKeyDown(KeyCode.Y))
+        {
+            if (holdingLetter)
+            {
+                letterManager.ShowLetter(currentLetter, toggleLetter);
+                toggleLetter = !toggleLetter;
+                audioManager.LetterSound();
+            }
+        }
+        else if (Input.GetKeyDown(KeyCode.X))
+        {
+            Cell currCell = cells[currPos.x, currPos.y].GetComponent<Cell>();
+            if (currCell.GetCellType() == Cell.CellType.LETTER)
+            {
+                if (!holdingLetter)
+                {
+                    objectiveString = "Objectives \n \n - NEW!! To open current letter, press Y. \n - To swap with a new letter, press X on top of letter.";
+                    currentLetter = currCell.letterObject;
+                    currCell.PickupLetter();
+                    holdingLetter = true;
+                    audioManager.LetterSound();
+                }
+                else
+                {
+                    // swap letters
+                    currCell.PickupLetter();
+                    currCell.SetLetter(0);
+                    Letter tmpNewLetter = currCell.letterObject;
+
+                    letterManager.SetLetterWithExistingLetter(currCell, currentLetter);
+
+                    holdingLetter = true;
+                    audioManager.LetterSound();
+                    currentLetter = tmpNewLetter;
+                }
+                SetLetterPreview();
+            }
+
+        }
+
+
+        // Start input handling. We don't want to take input at every frame because it's too quick.
         if (timePass < .05f)
         {
             timePass += Time.deltaTime;
@@ -370,7 +510,14 @@ public class LevelScript : MonoBehaviour
         }
     }
 
-    bool MoveProcess(int newX, int newY)
+    private void SetLetterPreview(bool active = true)
+    {
+        letterPreview.SetActive(active);
+        string letterContent = currentLetter.ReadContent();
+        letterPreview.GetComponent<Text>().text = "Letter preview: " + letterContent.Substring(0, Mathf.Min(letterContent.Length, 35));
+    }
+    
+    private bool MoveProcess(int newX, int newY)
     {
         if (newX < 0 || newX >= rows || newY < 0 || newY >= columns)
         {
@@ -383,10 +530,11 @@ public class LevelScript : MonoBehaviour
         if (newCell.GetCellType() == Cell.CellType.ITEM)
         {
             newCell.ConsumeItem();
+            audioManager.ItemSound();
             points += 1;
         }
-        // If item, pick it up
-        // If goal, take them
+
+        audioManager.Walk();
         return true;
     }
 }

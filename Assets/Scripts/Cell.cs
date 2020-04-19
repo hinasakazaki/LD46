@@ -6,11 +6,15 @@ public class Cell : MonoBehaviour
 {
     public Color color;
     public GameObject player;
-    public GameObject goal;
-    public GameObject item;
+    public GameObject letter;
+    public GameObject person;
+    public GameObject item; 
     public GameObject obstacle;
-    public Sprite[] goal_sprites;
-    public Sprite[] final_goal_sprites;
+    public Sprite[] letter_sprites;
+    public Sprite[] person_sprites;
+
+    public Letter letterObject;
+    public string personName;
 
     CellType type;
 
@@ -25,12 +29,29 @@ public class Cell : MonoBehaviour
     //  4. Excepting the paths
     //     - Add noncrucial items at random (25%?)
     //     - Add obstacles (50%?)
-    public enum CellType { PLAYER, BG, OBSTACLE, ITEM, GOAL };
+    public enum CellType { BG, OBSTACLE, ITEM, LETTER, PERSON };
 
     // Start is called before the first frame update
     void Start()
     {
 
+    }
+
+    public void GetPersonName()
+    {
+        return personName;
+    }
+
+    public void SetLetterObject(Letter letter, string to, string from)
+    {
+        letterObject = letter;
+        letterObject.SetTo(to);
+        letterObject.SetFrom(from);
+    }
+
+    public void SetLetterObject(Letter letter)
+    {
+        letterObject = letter;
     }
 
     public bool IsValidNeighbor()
@@ -59,31 +80,30 @@ public class Cell : MonoBehaviour
     public void ConsumeItem()
     {
         item.SetActive(false);
-        this.type = CellType.BG;
+        type = CellType.BG;
     }
 
     public void SetPlayer(bool on)
     {
         player.SetActive(on);
-        if (on)
-        {
-            this.type = CellType.PLAYER;
-        } else
-        {
-            this.type = CellType.BG;
-        }
     }
 
-    public bool SetGoal(int i)
+    public bool SetLetter(int i)
     {
-        if (this.type == CellType.PLAYER)
+        if (this.type != CellType.BG)
         {
             return false;
         }
-        goal.SetActive(true);
-        goal.GetComponent<SpriteRenderer>().sprite = goal_sprites[i];
-        this.type = CellType.GOAL;
+        letter.SetActive(true);
+        letter.GetComponent<SpriteRenderer>().sprite = letter_sprites[i];
+        this.type = CellType.LETTER;
         return true;
+    }
+
+    public void PickupLetter()
+    {
+        letter.SetActive(false);
+        this.type = CellType.BG;
     }
 
     public CellType GetCellType()
@@ -91,11 +111,12 @@ public class Cell : MonoBehaviour
         return type;
     }
 
-    public void SetFinalGoal(int i)
+    public void SetPerson(int i, string name)
     {
-        goal.SetActive(true);
-        goal.GetComponent<SpriteRenderer>().sprite = final_goal_sprites[i];
-        this.type = CellType.GOAL;
+        person.SetActive(true);
+        person.GetComponent<SpriteRenderer>().sprite = person_sprites[i];
+        this.personName = name;
+        this.type = CellType.PERSON;
     }
 
     public bool PlaceObstacle(bool on)
