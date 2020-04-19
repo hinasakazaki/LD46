@@ -20,6 +20,8 @@ public class LetterManager : MonoBehaviour
             new Letter(false, "I understand you completely and you shouldn't worry about the questions in your head. \nWe're like, the same person!"),
             new Letter(false, "You are the worst. \nI hope you are ashamed of yourself for making me feel this way."),
             new Letter(false, "I wish I had never met you."),
+            new Letter(false, "Why are you always like this? You're driving me insane!!!!"),
+            new Letter(false, "I never did anything wrong. It's always you. You don't deserve me if you can't handle me at my worst!!"),
         }.ToArray();
 
     private HashSet<int> used_real = new HashSet<int>();
