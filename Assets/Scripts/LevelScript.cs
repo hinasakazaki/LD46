@@ -39,6 +39,7 @@ public class LevelScript : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        Debug.Log("Hi starting!");
         personA = personANames[Random.Range(0, personANames.Length)];
         personB = personBNames[Random.Range(0, personBNames.Length)];
 
@@ -49,6 +50,7 @@ public class LevelScript : MonoBehaviour
         SetPlayerStartingPosition();
 
         FillGoalsAndItems();
+        Debug.Log("Finished startup");
     }
 
     private void SetBackgroundCells()
@@ -58,7 +60,7 @@ public class LevelScript : MonoBehaviour
 
         float x_pos = -7.7f;
         float y_pos = 4.7f;
-        float cell_width = .59f;
+        float cell_width = .595f;
          
         ColorScheme color_scheme = new ColorScheme();
         for (int i = 0; i < rows; i++)
@@ -179,6 +181,7 @@ public class LevelScript : MonoBehaviour
                 obstacles.Add(obstacle_candidate);
             }
         }
+        Debug.Log("Random obstacles added");
 
         // A* search from start to goals
         foreach (Coordinates goal in activeGoals)
@@ -201,6 +204,7 @@ public class LevelScript : MonoBehaviour
 
             }
         }
+        Debug.Log("Items along path added.");
 
         // For the rest of the cells, fill with random items, fake goals, and more obstacles.
         for (int i = 0; i < rows; i++)
@@ -220,21 +224,30 @@ public class LevelScript : MonoBehaviour
                             person1 = personB;
                             person2 = personA;
                         }
-                        letterManager.SetFakeLetter(cells[i, j].GetComponent<Cell>(), person1, person2);
+                        Debug.Log("Trying to put fake letter.");
+                        bool success = letterManager.SetFakeLetter(cells[i, j].GetComponent<Cell>(), person1, person2);
+                        if (!success)
+                        {
+                            cells[i, j].GetComponent<Cell>().PickupLetter();
+                            Debug.Log("Failed to put fake letter. It's okay");
+                        }
                     }
                     else if (Random.Range(0, 4) == 1)
                     {
                         // Put items at a 25% chance
+                        Debug.Log("Trying to put item.");
                         cells[i, j].GetComponent<Cell>().SetItem();
                     }
                     else if (!noObstaclesAllowed.Contains(new Coordinates(i, j)) && Random.Range(0, 2) == 1)
                     {
                         // 50% obstacle
+                        Debug.Log("Trying to put obstacle.");
                         cells[i, j].GetComponent<Cell>().PlaceObstacle(true);
                     }
                 }
             }
         }
+        Debug.Log("Fake goals, items, and obstacles added.");
     }
 
     private void RemoveRandomObstacle()
@@ -443,7 +456,7 @@ public class LevelScript : MonoBehaviour
             {
                 if (!holdingLetter)
                 {
-                    objectiveString = "Objectives \n \n - NEW!! To open current letter, press Y. \n - To swap with a new letter, press X on top of letter.";
+                    objectiveString = "Objectives \n \n - NEW!! To open/close current letter, press Y. \n - To swap with a new letter, press X on top of letter.";
                     currentLetter = currCell.letterObject;
                     currCell.PickupLetter();
                     holdingLetter = true;

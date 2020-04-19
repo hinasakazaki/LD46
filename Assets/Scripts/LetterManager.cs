@@ -60,15 +60,22 @@ public class LetterManager : MonoBehaviour
         used_real.Add(index);
     }
 
-    public void SetFakeLetter(Cell cell, string from, string to)
+    public bool SetFakeLetter(Cell cell, string from, string to)
     {
+        int max_tries = 5;
         int index = Random.Range(0, possibleFakeLetters.Length);
         while (used_fake.Contains(index))
         {
+            if (max_tries == 0)
+            {
+                return false;
+            }
             index = Random.Range(0, possibleFakeLetters.Length);
+            max_tries -= 1;
         }
         cell.SetLetterObject(possibleFakeLetters[index], from, to);
         used_fake.Add(index);
+        return true;
     }
 
     public void SetLetterWithExistingLetter(Cell cell, Letter letter)

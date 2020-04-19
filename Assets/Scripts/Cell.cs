@@ -12,6 +12,7 @@ public class Cell : MonoBehaviour
     public GameObject obstacle;
     public Sprite[] letter_sprites;
     public Sprite[] person_sprites;
+    public Sprite[] obstacle_sprites;
 
     public Letter letterObject;
     public string personName;
@@ -134,6 +135,7 @@ public class Cell : MonoBehaviour
         }
 
         obstacle.SetActive(on);
+        obstacle.GetComponent<SpriteRenderer>().sprite = obstacle_sprites[Random.Range(0, obstacle_sprites.Length)];
         return true;
     }
 
