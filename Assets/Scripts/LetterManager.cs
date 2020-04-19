@@ -61,7 +61,7 @@ public class LetterManager : MonoBehaviour
     public void SetFakeLetter(Cell cell, string from, string to)
     {
         int index = Random.Range(0, possibleFakeLetters.Length);
-        while (used_real.Contains(index))
+        while (used_fake.Contains(index))
         {
             index = Random.Range(0, possibleFakeLetters.Length);
         }
