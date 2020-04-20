@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class Cell : MonoBehaviour
 {
@@ -16,6 +17,11 @@ public class Cell : MonoBehaviour
 
     public Letter letterObject;
     public string personName;
+    public static HashSet<int> used_ppl = new HashSet<int>();
+
+    public SpriteRenderer dialogBox;
+    public SpriteRenderer heart;
+    public SpriteRenderer brokenHeart;
 
     CellType type;
 
@@ -112,12 +118,37 @@ public class Cell : MonoBehaviour
         return type;
     }
 
-    public void SetPerson(int i, string name)
+    public Sprite SetPerson(string name)
     {
+        Debug.Log("Hello~");
+
+        int index = Random.Range(0, person_sprites.Length);
+        while (used_ppl.Contains(index))
+        {
+            index = Random.Range(0, person_sprites.Length);
+        }
+        Debug.Log("Using index " + index + "for person sprite " + name);
+        used_ppl.Add(index);
         person.SetActive(true);
-        person.GetComponent<SpriteRenderer>().sprite = person_sprites[i];
+        person.GetComponent<SpriteRenderer>().sprite = person_sprites[index];
         this.personName = name;
         this.type = CellType.PERSON;
+
+        return person_sprites[index];
+    }
+
+    public void SetHappy()
+    {
+        dialogBox.enabled = true;
+        heart.enabled = true;
+        brokenHeart.enabled = false;
+    }
+
+    public void SetUnhappy()
+    {
+        dialogBox.enabled = true;
+        heart.enabled = false;
+        brokenHeart.enabled = true;
     }
 
     public bool PlaceObstacle(bool on)
@@ -142,6 +173,24 @@ public class Cell : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        
+
     }
+
+    void OnEnable()
+    {
+        //Tell our 'OnLevelFinishedLoading' function to start listening for a scene change as soon as this script is enabled.
+        SceneManager.sceneLoaded += OnLevelFinishedLoading;
+    }
+
+    void OnDisable()
+    {
+        //Tell our 'OnLevelFinishedLoading' function to stop listening for a scene change as soon as this script is disabled. Remember to always have an unsubscription for every delegate you subscribe to!
+        SceneManager.sceneLoaded -= OnLevelFinishedLoading;
+    }
+
+    void OnLevelFinishedLoading(Scene scene, LoadSceneMode mode)
+    {
+        used_ppl = new HashSet<int>();
+    }
+
 }

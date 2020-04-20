@@ -8,6 +8,7 @@ public class LevelScript : MonoBehaviour
 {
     public AudioManager audioManager;
     public LetterManager letterManager;
+    ColorScheme color_scheme;
 
     public GameObject cell;
     public int rows = 14;
@@ -21,6 +22,7 @@ public class LevelScript : MonoBehaviour
 
     public int points = 0;
     public Text timeLabel;
+    public float timeLeft;
     public Text pointsLabel;
     public Text objectiveLabel;
     public string objectiveString;
@@ -29,12 +31,26 @@ public class LevelScript : MonoBehaviour
     public bool holdingLetter = false;
     public Letter currentLetter;
     private bool toggleLetter = false;  // hide --> show, show --> hide
-
+    private bool showNeighborObjective = false;
     string[] personANames = new List<string> { "Skye", "Noa", "Caelan", "Flynn", "Jesse" }.ToArray();
     string[] personBNames = new List<string> { "Harper", "Hayden", "Linden", "Nevada", "Oakley"}.ToArray();
 
+    public Text personAName;
+    public Text personBName;
+    public Image personAImage;
+    public Image personBImage;
     string personA;
     string personB;
+    public bool personAHappy;
+    public bool personBHappy;
+
+    private float therapySession = 120;
+    public bool gameEnded = false;
+    public GameObject endScreen;
+    public GameObject endGame;
+    public Text endText;
+
+    public GameObject gamestuff;
 
     // Start is called before the first frame update
     void Start()
@@ -42,8 +58,12 @@ public class LevelScript : MonoBehaviour
         Debug.Log("Hi starting!");
         personA = personANames[Random.Range(0, personANames.Length)];
         personB = personBNames[Random.Range(0, personBNames.Length)];
+        personAName.text = personA;
+        personBName.text = personB;
 
-        objectiveString = "Objectives \n \n- Pick up \"emotion\" letters using X and find the true emotions.";
+        timeLeft = therapySession;
+
+        objectiveString = "Objectives \n \n- Use arrow keys to move and pick up \"emotion\" letters using X.";
 
         SetBackgroundCells();
 
@@ -61,8 +81,8 @@ public class LevelScript : MonoBehaviour
         float x_pos = -7.7f;
         float y_pos = 4.7f;
         float cell_width = .595f;
-         
-        ColorScheme color_scheme = new ColorScheme();
+
+        color_scheme = new ColorSchemes().getRandomColorScheme();
         for (int i = 0; i < rows; i++)
         {
             for (int j = 0; j < columns; j++)
@@ -124,10 +144,10 @@ public class LevelScript : MonoBehaviour
             {
                 if (goalsPlaced == 0)
                 {
-                    letterManager.SetRealLetter(cells[x, y].GetComponent<Cell>(), personA, personB);
+                    letterManager.SetRealLetter(cells[x, y].GetComponent<Cell>(), personB, personA);
                 } else
                 {
-                    letterManager.SetRealLetter(cells[x, y].GetComponent<Cell>(), personB, personA);
+                    letterManager.SetRealLetter(cells[x, y].GetComponent<Cell>(), personA, personB);
                 }
                 goalsPlaced += 1;
                 activeGoals.Add(goal_candidate);
@@ -144,7 +164,7 @@ public class LevelScript : MonoBehaviour
                     if (neighbors.Length == 0)
                     {
                         Debug.LogError("Things are bad (no final goals available) so reloading scene.");
-                        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+                        ReloadScene();
                     }
                     Coordinates randomNeighbor = neighbors[Random.Range(0, neighbors.Length)];
                     while (randomNeighbor.Equals(goal_candidate))
@@ -158,10 +178,10 @@ public class LevelScript : MonoBehaviour
                 // finally add final goal
                  if (goalsPlaced == 1)
                 {
-                    cells[path.x, path.y].GetComponent<Cell>().SetPerson(finalGoalCount, personA);
+                    personAImage.sprite = cells[path.x, path.y].GetComponent<Cell>().SetPerson(personA);
                 } else
                 {
-                    cells[path.x, path.y].GetComponent<Cell>().SetPerson(finalGoalCount, personB);
+                    personBImage.sprite = cells[path.x, path.y].GetComponent<Cell>().SetPerson(personB);
                 }
                 finalGoals.Add(path);
                 finalGoalCount += 1;
@@ -248,6 +268,34 @@ public class LevelScript : MonoBehaviour
             }
         }
         Debug.Log("Fake goals, items, and obstacles added.");
+    }
+
+    private bool NeighborIsPerson()
+    {
+        bool neighborIsPerson = false;
+        if (currPos.x + 1 < rows && cells[currPos.x + 1, currPos.y].GetComponent<Cell>().GetCellType() == Cell.CellType.PERSON)
+        {
+            neighborIsPerson = true;
+        }
+
+        // down
+        if (currPos.x - 1 >= 0 && cells[currPos.x - 1, currPos.y].GetComponent<Cell>().GetCellType() == Cell.CellType.PERSON)
+        {
+            neighborIsPerson = true;
+        }
+
+        // left
+        if (currPos.y - 1 >= 0 && cells[currPos.x, currPos.y - 1].GetComponent<Cell>().GetCellType() == Cell.CellType.PERSON)
+        {
+            neighborIsPerson = true;
+        }
+
+        // right
+        if (currPos.y + 1 < columns && cells[currPos.x, currPos.y + 1].GetComponent<Cell>().GetCellType() == Cell.CellType.PERSON)
+        {
+            neighborIsPerson = true;
+        }
+        return neighborIsPerson;
     }
 
     private void RemoveRandomObstacle()
@@ -398,17 +446,17 @@ public class LevelScript : MonoBehaviour
 
     private void SetTimer()
     {
-        float seconds = Time.timeSinceLevelLoad;
+        timeLeft = therapySession - Time.timeSinceLevelLoad;
         string mins = "00";
         string secs = "00";
-        if (seconds > 60)
+        if (timeLeft > 60)
         {
-            mins = ((int)seconds / 60).ToString();
+            mins = ((int)timeLeft / 60).ToString();
         }
 
-        if (seconds > 0)
+        if (timeLeft > 0)
         {
-            int secs_int = ((int)seconds % 60);
+            int secs_int = ((int)timeLeft % 60);
             if (secs_int < 10)
             {
                 secs = "0" + secs_int.ToString();
@@ -429,11 +477,74 @@ public class LevelScript : MonoBehaviour
     private void SetObjective()
     {
         objectiveLabel.text = objectiveString;
+
+        if (holdingLetter && !showNeighborObjective && NeighborIsPerson())
+        {
+            objectiveString = "Objectives \n - To open / close current letter, press Y. \n -  NEW!! If you think the letter contains \"True feelings\", deliver it to the recipient by pressing X while on the same square as them.";
+            showNeighborObjective = true;
+        }
     }
 
+    private void HandleGameEnd()
+    {
+        letterManager.ShowLetter(currentLetter, toggleLetter);
+        endScreen.SetActive(true);
+        gamestuff.SetActive(false);
+        endGame.SetActive(true);
+        if (personAHappy && personBHappy && points > 30)
+        {
+            endScreen.GetComponent<SpriteRenderer>().color = color_scheme.GetBg1();
+            endText.text = "Well done!! \n\n" + personA + " and " + personB + " made progress in understanding each others' feelings and it seems like their love will go on! \n\nYou finished this appointment on time with " + timeLeft + " seconds to spare and you got a very good online review for scoring " + points + " in this session. \n\n"
+                + "To go to your next appointment, refresh.";
+
+        }
+        else if (personAHappy && personBHappy)
+        {
+            endScreen.GetComponent<SpriteRenderer>().color = color_scheme.GetBg2();
+            endText.text = "Well done!! \n\n" + personA + " and " + personB + " made progress in understanding each others' feelings and it seems like their love will go on! \n\nYou finished this appointment on time with " + timeLeft + " seconds to spare and you got a very good online review DESPITE scoring " + points + " in this session. \n\n"
+                + "To go to your next appointment, refresh.";
+
+        }
+        else if (personAHappy || personBHappy && points > 30)
+        {
+            endScreen.GetComponent<SpriteRenderer>().color = color_scheme.GetBg3();
+            endText.text = "Nice try! \n\n" + personA + " and " + personB + " made some progress in understanding each others' feelings but there is a lot of work to be done. \n\nYou got a positive online review for your help and you scored " + points + " in this session. \n\n"
+    + "To go to your next appointment, refresh.";
+        } else if (points > 30)
+        {
+            endScreen.GetComponent<SpriteRenderer>().color = Color.gray;
+            endText.color = Color.white;
+            endText.text = "Nice try! \n\n" + personA + " and " + personB + " did not make much progress in understanding each other, but you got a positive online review for your help by scoring " + points + " in this session. \n\n"
+       + "To go to your next appointment, refresh.";
+
+        } else
+        {
+            endScreen.GetComponent<SpriteRenderer>().color = Color.black;
+            endText.color = Color.white;
+            endText.text = "Too bad! \n\n" + personA + " and " + personB + " did not make much progress in understanding each other, and you got a negative online review for scoring " + points + " in this session. \n\n"
+       + "To go to your next appointment, press R.";
+        }
+    }
+
+    void ReloadScene()
+    {
+        SceneManager.LoadScene("main", LoadSceneMode.Single);
+    }
+    
     // Update is called once per frame
     void Update()
     {
+        if (gameEnded)
+        {
+            return;
+        }
+
+        if ((personAHappy && personBHappy) || (timeLeft <= 0)) {
+            gameEnded = true;
+            HandleGameEnd();
+            return;
+        }
+
         SetTimer();
         SetPoints();
         SetObjective();
@@ -456,7 +567,7 @@ public class LevelScript : MonoBehaviour
             {
                 if (!holdingLetter)
                 {
-                    objectiveString = "Objectives \n \n - NEW!! To open/close current letter, press Y. \n - To swap with a new letter, press X on top of letter.";
+                    objectiveString = "Objectives \n - NEW!! To open/close current letter, press Y. \n - To swap with a new letter, press X on top of letter.";
                     currentLetter = currCell.letterObject;
                     currCell.PickupLetter();
                     holdingLetter = true;
@@ -476,8 +587,53 @@ public class LevelScript : MonoBehaviour
                     currentLetter = tmpNewLetter;
                 }
                 SetLetterPreview();
-            }
+            } else if (currCell.GetCellType() == Cell.CellType.PERSON)
+            {
+                if (!holdingLetter)
+                {
+                    objectiveString = "Objective \n - Get letters using X, assess whether they capture true emotions with Y. \n - Then, give it to the recipient using X. \n - Swap letters using X.";
 
+                    return;
+                }
+                else if (currCell.GetPersonName() != currentLetter.GetTo())
+                {
+
+                    objectiveString = "Tip \n - Looks like that letter wasn't addressed to that person. Try another one! \n - Remember you can swap letters using X.";
+                    return;
+                }
+                else if (currentLetter.IsReal())
+                {
+                    points += 10;
+                    currCell.SetHappy();
+                    if (personA.Equals(currCell.GetPersonName()) && !personAHappy)
+                    {
+                        personAHappy = true;
+                        audioManager.HappySound();
+                    } else if (personB.Equals(currCell.GetPersonName()) && !personBHappy)
+                    {
+                        personBHappy = true;
+                        audioManager.HappySound();
+                    }
+                    if (!(personAHappy && personBHappy))
+                    {
+                        objectiveString = "Great job!! \n Now make sure the communication goes both way by doing the same for your other client.";
+                    }
+                }
+                else
+                {
+                    // Fake letter
+                    points -= 10;
+                    audioManager.SadSound();
+                    currCell.SetUnhappy();
+                    objectiveString = "Tip \n - Looks like that letter didn't capture true emotions. Try another one! \n - Remember you can swap letters using X.";
+                }
+
+            }
+        }
+        else if (Input.GetKeyDown(KeyCode.R))
+        {
+            Debug.LogError("Reloading scene from command.");
+            ReloadScene();
         }
 
 
@@ -513,11 +669,6 @@ public class LevelScript : MonoBehaviour
         {
             move = true;
             newY += 1;
-        }
-        else if (Input.GetKey(KeyCode.R))
-        {
-            Debug.LogError("Reloading scene from command.");
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
         if (move && MoveProcess(newX, newY))
         {

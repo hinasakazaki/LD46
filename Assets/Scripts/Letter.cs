@@ -37,5 +37,10 @@ public class Letter
     {
         return this.to;
     }
+
+    public bool IsReal()
+    {
+        return this.real;
+    }
     
 }

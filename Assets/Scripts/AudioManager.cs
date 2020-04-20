@@ -9,6 +9,8 @@ public class AudioManager : MonoBehaviour
     public AudioClip ding;
     public AudioClip[] paperList = new AudioClip[2];
     public AudioSource SFX;
+    public AudioClip shatter;
+    public AudioClip happy;
     
     // Start is called before the first frame update
     void Start()
@@ -26,6 +28,16 @@ public class AudioManager : MonoBehaviour
     public void ItemSound()
     {
         SFX.PlayOneShot(ding, 0.7f);
+    }
+
+    public void HappySound()
+    {
+        SFX.PlayOneShot(happy, 0.7f);
+    }
+
+    public void SadSound()
+    {
+        SFX.PlayOneShot(shatter, 0.7f);
     }
 
     public void LetterSound()
